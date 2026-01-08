@@ -1,5 +1,6 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 import '../services/realtime_db_service.dart';
 import '../services/storage_service.dart';
@@ -124,5 +125,40 @@ class UserRepository {
       throw Exception('Lỗi cập nhật profile: ${e.toString()}');
     }
   }
+  /// Lấy tất cả users (để tìm kiếm)
+  Future<List<UserModel>> getAllUsers() async {
+    try {
+      final snapshot = await _dbService.usersRef().get();
+      if (!snapshot.exists || snapshot.value == null) return [];
+      
+      final dynamic data = snapshot.value;
+      List<UserModel> users = [];
+      
+      if (data is Map) {
+        data.forEach((key, value) {
+          if (value is Map) {
+            try {
+              users.add(UserModel.fromJson(Map<String, dynamic>.from(value)));
+            } catch (e) {
+              debugPrint('Lỗi parse user $key: $e');
+            }
+          }
+        });
+      } else if (data is List) {
+        for (var value in data) {
+          if (value is Map) {
+            try {
+              users.add(UserModel.fromJson(Map<String, dynamic>.from(value)));
+            } catch (e) {
+              debugPrint('Lỗi parse user list item: $e');
+            }
+          }
+        }
+      }
+      return users;
+    } catch (e) {
+      debugPrint('Lỗi getAllUsers: $e');
+      return [];
+    }
+  }
 }
-

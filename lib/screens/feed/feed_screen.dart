@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/post_model.dart';
 import '../../repositories/post_repository.dart';
 import '../../providers/audio_player_provider.dart';
@@ -85,8 +86,9 @@ class _FeedScreenState extends State<FeedScreen> {
     Future.delayed(const Duration(milliseconds: 300), () {
       if (mounted) {
         // Kiểm tra mounted để tránh lỗi khi đã dispose
-        audioProvider.playPost(posts[page]);
-        print('▶️ Phát nhạc: ${posts[page].musicTitle}');
+        final post = posts[page];
+        audioProvider.playPost(post);
+        print('▶️ Phát nhạc: ${post.musicTitle}');
       }
     });
 

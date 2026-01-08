@@ -170,14 +170,46 @@ class MusicRepository {
 
   /// Search musics (client-side filter)
   Future<List<MusicModel>> searchMusics(String keyword) async {
-    final allMusics = await streamAllMusics().first;
-    final lowerKeyword = keyword.toLowerCase();
-    
-    return allMusics.where((music) {
-      return music.title.toLowerCase().contains(lowerKeyword) ||
-          music.ownerName.toLowerCase().contains(lowerKeyword) ||
-          music.genre.toLowerCase().contains(lowerKeyword);
-    }).toList();
+    try {
+      final snapshot = await _dbService.musicsRef().get();
+      if (!snapshot.exists || snapshot.value == null) return [];
+      
+      final lowerKeyword = keyword.toLowerCase();
+      final dynamic data = snapshot.value;
+      final List<MusicModel> musics = [];
+
+      void processItem(dynamic key, dynamic value) {
+        if (value is Map) {
+          try {
+            final music = MusicModel.fromJson(
+              Map<String, dynamic>.from(value),
+              key.toString(),
+            );
+            
+            if (music.title.toLowerCase().contains(lowerKeyword) ||
+                music.ownerName.toLowerCase().contains(lowerKeyword) ||
+                music.genre.toLowerCase().contains(lowerKeyword)) {
+              musics.add(music);
+            }
+          } catch (e) {
+            // Skip invalid
+          }
+        }
+      }
+
+      if (data is Map) {
+        data.forEach((key, value) => processItem(key, value));
+      } else if (data is List) {
+        for (int i = 0; i < data.length; i++) {
+          processItem(i, data[i]);
+        }
+      }
+      
+      return musics;
+    } catch (e) {
+      debugPrint('Lỗi searchMusics: $e');
+      return [];
+    }
   }
 
   /// Cập nhật thông tin music

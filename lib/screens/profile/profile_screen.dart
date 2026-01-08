@@ -16,6 +16,8 @@ import '../auth/login_screen.dart';
 import '../post_detail/post_detail_screen.dart';
 import 'edit_profile_screen.dart';
 import '../music_library/edit_music_screen.dart';
+import '../favorites/favorites_screen.dart';
+import '../../widgets/send_music_sheet.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -319,6 +321,25 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
           ],
           const SizedBox(height: 20),
+          // Quick access buttons
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Nút Đã lưu
+              _buildQuickAccessButton(
+                icon: Icons.bookmark,
+                label: 'Đã lưu',
+                color: Colors.amber,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: _handleLogout,
             icon: const Icon(Icons.logout),
@@ -331,6 +352,40 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildQuickAccessButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -405,6 +460,17 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.share_outlined, color: Colors.blue),
+                            onPressed: () {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (context) => SendMusicSheet(post: post),
+                              );
+                            },
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete_outline, color: Colors.red),

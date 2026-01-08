@@ -7,6 +7,8 @@ import '../providers/audio_player_provider.dart';
 import '../repositories/reaction_repository.dart';
 import '../screens/post_detail/post_detail_screen.dart';
 import '../screens/profile/user_profile_screen.dart';
+import 'favorite_button.dart';
+import 'send_music_sheet.dart';
 
 /// Widget card hiển thị bài đăng nhạc với nút tim tương tác ở ngoài
 class MusicPostCard extends StatefulWidget {
@@ -413,7 +415,7 @@ class _MusicPostCardState extends State<MusicPostCard> with SingleTickerProvider
                             final isPlaying = isCurrentPost && audioProvider.isPlaying;
                             
                             return InkWell(
-                              onTap: () {
+                              onTap: () async {
                                 if (isCurrentPost) {
                                   audioProvider.togglePlayPause();
                                 } else {
@@ -464,6 +466,21 @@ class _MusicPostCardState extends State<MusicPostCard> with SingleTickerProvider
                             ),
                           );
                         },
+                      ),
+                    ),
+                    // Góc phải dưới: nút thêm vào yêu thích
+                    Positioned(
+                      right: 12,
+                      bottom: 12,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.7),
+                          shape: BoxShape.circle,
+                        ),
+                        child: FavoriteButton(
+                          post: widget.post,
+                          size: 22,
+                        ),
                       ),
                     ),
                   ],
@@ -669,9 +686,9 @@ class _MusicPostCardState extends State<MusicPostCard> with SingleTickerProvider
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -698,25 +715,26 @@ class _MusicPostCardState extends State<MusicPostCard> with SingleTickerProvider
                   ),
                   const SizedBox(height: 16),
                   ListTile(
-                    leading: const Icon(Icons.link, color: Colors.blue),
+                    leading: const Icon(Icons.send_rounded, color: Colors.blue),
+                    title: const Text('Gửi cho bạn bè trong app'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) => SendMusicSheet(post: widget.post),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.link, color: Colors.grey),
                     title: const Text('Sao chép liên kết'),
                     onTap: () {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Đã sao chép liên kết'),
-                        ),
-                      );
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.share, color: Colors.green),
-                    title: const Text('Chia sẻ qua...'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Tính năng đang phát triển'),
                         ),
                       );
                     },

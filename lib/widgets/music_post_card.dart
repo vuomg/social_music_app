@@ -8,7 +8,6 @@ import '../repositories/reaction_repository.dart';
 import '../screens/post_detail/post_detail_screen.dart';
 import '../screens/profile/user_profile_screen.dart';
 import 'favorite_button.dart';
-import 'send_music_sheet.dart';
 
 /// Widget card hiển thị bài đăng nhạc với nút tim tương tác ở ngoài
 class MusicPostCard extends StatefulWidget {
@@ -719,11 +718,8 @@ class _MusicPostCardState extends State<MusicPostCard> with SingleTickerProvider
                     title: const Text('Gửi cho bạn bè trong app'),
                     onTap: () {
                       Navigator.pop(context);
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (context) => SendMusicSheet(post: widget.post),
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Tính năng gửi nhạc đang phát triển')),
                       );
                     },
                   ),

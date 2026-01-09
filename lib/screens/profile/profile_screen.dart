@@ -17,7 +17,6 @@ import '../post_detail/post_detail_screen.dart';
 import 'edit_profile_screen.dart';
 import '../music_library/edit_music_screen.dart';
 import '../favorites/favorites_screen.dart';
-import '../../widgets/send_music_sheet.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -464,11 +463,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                           IconButton(
                             icon: const Icon(Icons.share_outlined, color: Colors.blue),
                             onPressed: () {
-                              showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (context) => SendMusicSheet(post: post),
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Tính năng chia sẻ đang phát triển')),
                               );
                             },
                           ),

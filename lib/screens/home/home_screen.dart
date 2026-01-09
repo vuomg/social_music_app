@@ -8,7 +8,6 @@ import '../profile/profile_screen.dart';
 import '../music_rooms/music_rooms_screen.dart'; // Changed from friends_screen.dart
 import '../notifications/notifications_screen.dart';
 import '../search/search_screen.dart';
-import '../../widgets/mini_player.dart';
 import '../../widgets/notification_badge.dart';
 import '../../providers/audio_player_provider.dart';
 

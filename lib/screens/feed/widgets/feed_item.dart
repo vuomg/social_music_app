@@ -25,7 +25,6 @@ class FeedItem extends StatefulWidget {
 }
 
 class _FeedItemState extends State<FeedItem> with SingleTickerProviderStateMixin {
-  bool _showUI = true;
   late AnimationController _likeAnimationController;
   bool _isLiked = false;
   int _likeCount = 0;
@@ -228,20 +227,10 @@ class _FeedItemState extends State<FeedItem> with SingleTickerProviderStateMixin
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Background image/cover (fullscreen)
         _buildBackground(),
-        
-        // Gradient overlays for better text visibility
         _buildGradients(),
-        
-        // Play/Pause indicator (hidden for auto-play)
-        _buildPlayPauseIndicator(),
-        
-        // Right sidebar actions (TikTok style)
-        if (_showUI) _buildRightActions(),
-        
-        // Bottom info overlay
-        if (_showUI) _buildBottomInfo(),
+        _buildRightActions(),
+        _buildBottomInfo(),
       ],
     );
   }
@@ -316,44 +305,6 @@ class _FeedItemState extends State<FeedItem> with SingleTickerProviderStateMixin
         ),
       ],
     );
-  }
-
-  Widget _buildPlayPauseIndicator() {
-    // Hidden - auto-play like TikTok (no manual play button)
-    return const SizedBox.shrink();
-    
-    /* Old code - removed for TikTok-style auto-play
-    return Consumer<AudioPlayerProvider>(
-      builder: (context, audioProvider, child) {
-        final isCurrentPost = audioProvider.currentPost?.postId == widget.post.postId;
-        final isPlaying = isCurrentPost && audioProvider.isPlaying;
-
-        if (isPlaying) return const SizedBox.shrink();
-
-        return Center(
-          child: IgnorePointer(
-            child: AnimatedOpacity(
-              opacity: isPlaying ? 0.0 : 0.9,
-              duration: const Duration(milliseconds: 300),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.black.withOpacity(0.5),
-                  border: Border.all(color: Colors.white, width: 3),
-                ),
-                child: const Icon(
-                  Icons.play_arrow_rounded,
-                  size: 50,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-    */
   }
 
   Widget _buildRightActions() {

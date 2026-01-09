@@ -252,10 +252,8 @@ class _MusicPickerSheetState extends State<MusicPickerSheet> {
                                 color: Colors.green,
                               ),
                               onPressed: () {
+                                // Call callback - parent will handle navigation
                                 widget.onSelect(music);
-                                if (mounted) {
-                                  Navigator.pop(context);
-                                }
                               },
                             ),
                           ],

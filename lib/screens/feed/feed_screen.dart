@@ -26,41 +26,64 @@ class FeedScreen extends StatefulWidget {
   State<FeedScreen> createState() => _FeedScreenState();
 }
 
-class _FeedScreenState extends State<FeedScreen> {
+class _FeedScreenState extends State<FeedScreen>
+    with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   // Repository để lấy danh sách posts
   final _postRepository = PostRepository();
 
   // Controller quản lý PageView (để biết đang ở trang nào)
-  late PageController _pageController;
+  final PageController _pageController = PageController();
 
   // Trang hiện tại (index của post đang hiển thị)
-  int _currentPage = 0;
+  int _currentPageIndex = 0;
 
   // Danh sách posts (lưu lại để không bị mất khi rebuild)
   List<PostModel>? _cachedPosts;
 
   // Flag để biết đã auto-play bài đầu tiên chưa
   bool _hasPlayedFirstPost = false;
+  
+  // Store provider reference for safe dispose
+  AudioPlayerProvider? _audioProvider;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
-
-    // Khởi tạo PageController (bắt đầu từ trang 0)
-    _pageController = PageController(initialPage: 0);
+    WidgetsBinding.instance.addObserver(this);
+    
+    // Store provider reference
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+      }
+    });
   }
 
   @override
   void dispose() {
-    // Dọn dẹp: dispose controller và dừng nhạc khi rời màn hình
+    WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
 
-    // Dừng nhạc khi rời khỏi Feed
-    final audioProvider =
-        Provider.of<AudioPlayerProvider>(context, listen: false);
-    audioProvider.stop();
+    // Use stored reference instead of Provider.of
+    _audioProvider?.stop();
 
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    // Stop audio khi app vào background
+    if (state == AppLifecycleState.paused || 
+        state == AppLifecycleState.inactive) {
+      final audioProvider =
+          Provider.of<AudioPlayerProvider>(context, listen: false);
+      audioProvider.stop();
+    }
   }
 
   /// HÀM XỬ LÝ KHI NGƯỜI DÙNG SCROLL SANG TRANG MỚI
@@ -68,10 +91,10 @@ class _FeedScreenState extends State<FeedScreen> {
   /// Logic autoplay:
   /// 1. Dừng nhạc của bài cũ
   /// 2. Phát nhạc của bài mới
-  /// 3. Cập nhật _currentPage
+  /// 3. Cập nhật _currentPageIndex
   void _onPageChanged(int page, List<PostModel> posts) {
     // Nếu page không đổi thì không làm gì
-    if (_currentPage == page) return;
+    if (_currentPageIndex == page) return;
 
     print('📄 Scroll sang trang $page (bài: ${posts[page].musicTitle})');
 
@@ -88,13 +111,13 @@ class _FeedScreenState extends State<FeedScreen> {
         // Kiểm tra mounted để tránh lỗi khi đã dispose
         final post = posts[page];
         audioProvider.playPost(post);
-        print('▶️ Phát nhạc: ${post.musicTitle}');
+        print('▶️ Auto-play: ${post.musicTitle}');
       }
     });
 
-    // BƯỚC 3: Cập nhật trang hiện tại
+    // BƯỚC 3: Cập nhật current page
     setState(() {
-      _currentPage = page;
+      _currentPageIndex = page;
     });
   }
 
@@ -122,6 +145,8 @@ class _FeedScreenState extends State<FeedScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // CRITICAL: Keep state alive between tab switches
+    
     return Scaffold(
       // KHÔNG CÓ AppBar (để full screen như TikTok)
       // Nếu muốn có AppBar, bỏ comment dòng dưới:
@@ -169,55 +194,76 @@ class _FeedScreenState extends State<FeedScreen> {
           });
 
           // ===== HIỂN thị PAGEVIEW (FULL SCREEN) =====
-          return PageView.builder(
-            // Controller để quản lý page
-            controller: _pageController,
-
-            // Scroll DỌC (như TikTok)
-            scrollDirection: Axis.vertical,
-
-            // Callback khi người dùng scroll sang trang mới
+          // Tách ra widget riêng để tránh rebuild
+          return _FeedPageView(
+            posts: posts,
+            initialPage: _currentPageIndex,
             onPageChanged: (page) => _onPageChanged(page, posts),
-
-            // Số lượng items
-            itemCount: posts.length,
-
-            // Build mỗi item (1 trang = 1 FeedItem)
-            itemBuilder: (context, index) {
-              final post = posts[index];
-
-              // Lấy trạng thái "đang phát nhạc" từ Provider
-              return Consumer<AudioPlayerProvider>(
-                builder: (context, audioProvider, child) {
-                  // Kiểm tra xem post này có đang phát không
-                  final isCurrentPostPlaying = _currentPage == index &&
-                      audioProvider.currentPost?.postId == post.postId &&
-                      audioProvider.isPlaying;
-
-                  // Widget FeedItem chiếm full screen
-                  return GestureDetector(
-                    // Khi tap vào post → mở PostDetailScreen
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PostDetailScreen(post: post),
-                        ),
-                      );
-                    },
-
-                    // FeedItem (widget chứa ảnh bìa, thông tin bài hát)
-                    child: FeedItem(
-                      post: post,
-                      isPlaying: isCurrentPostPlaying,
-                    ),
-                  );
-                },
-              );
-            },
           );
         },
       ),
+    );
+  }
+}
+
+/// Widget riêng cho PageView để tránh rebuild từ parent
+class _FeedPageView extends StatefulWidget {
+  final List<PostModel> posts;
+  final int initialPage;
+  final Function(int) onPageChanged;
+
+  const _FeedPageView({
+    required this.posts,
+    required this.initialPage,
+    required this.onPageChanged,
+  });
+
+  @override
+  State<_FeedPageView> createState() => _FeedPageViewState();
+}
+
+class _FeedPageViewState extends State<_FeedPageView> {
+  late PageController _pageController;
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPage = widget.initialPage;
+    _pageController = PageController(initialPage: widget.initialPage);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PageView.builder(
+      controller: _pageController,
+      scrollDirection: Axis.vertical,
+      onPageChanged: (page) {
+        setState(() => _currentPage = page);
+        widget.onPageChanged(page);
+      },
+      itemCount: widget.posts.length,
+      itemBuilder: (context, index) {
+        final post = widget.posts[index];
+
+        return Consumer<AudioPlayerProvider>(
+          builder: (context, audioProvider, child) {
+            final isCurrentPostPlaying = _currentPage == index &&
+                audioProvider.currentPost?.postId == post.postId &&
+                audioProvider.isPlaying;
+
+            return FeedItem(
+              post: post,
+            );
+          },
+        );
+      },
     );
   }
 }

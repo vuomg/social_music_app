@@ -8,8 +8,9 @@ import '../../repositories/post_repository.dart';
 import '../../repositories/user_repository.dart';
 import '../../models/user_model.dart';
 import '../../models/music_model.dart';
-import '../../widgets/music_picker_sheet.dart';
+import '../../widgets/music_picker_sheet_v2.dart' as picker;
 import '../../widgets/post_preview_card.dart';
+import '../../widgets/music_clip_selector.dart';
 
 class CreatePostScreen extends StatefulWidget {
   final VoidCallback? onPostSuccess;
@@ -30,6 +31,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   
   MusicModel? _selectedMusic;
   File? _postCoverFile; // Cover riêng cho post (optional)
+  int? _clipStartMs;
+  int? _clipEndMs;
   
   final PostRepository _postRepository = PostRepository();
   final UserRepository _userRepository = UserRepository();
@@ -117,6 +120,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         caption: caption,
         music: _selectedMusic!,
         postCoverFile: _postCoverFile,
+        startTimeMs: _clipStartMs,
+        endTimeMs: _clipEndMs,
       );
 
       setState(() {
@@ -129,6 +134,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         setState(() {
           _selectedMusic = null;
           _postCoverFile = null;
+          _clipStartMs = null;
+          _clipEndMs = null;
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -241,19 +248,27 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       OutlinedButton.icon(
                         onPressed: _isLoading
                             ? null
-                            : () {
-                                showModalBottomSheet(
+                            : () async {
+                                final music = await showModalBottomSheet<MusicModel>(
                                   context: context,
                                   backgroundColor: Colors.transparent,
                                   isScrollControlled: true,
-                                  builder: (context) => MusicPickerSheet(
+                                  builder: (context) => picker.MusicPickerSheet(
                                     onSelect: (music) {
-                                      setState(() {
-                                        _selectedMusic = music;
-                                      });
+                                      // Don't pop here - let MusicPickerSheet handle it
+                                      Navigator.of(context).pop(music);
                                     },
                                   ),
                                 );
+                                
+                                // Set music với default clip (30s đầu tiên)
+                                if (music != null && mounted) {
+                                  setState(() {
+                                    _selectedMusic = music;
+                                    _clipStartMs = 0; // Start at 0
+                                    _clipEndMs = 30000; // 30 seconds default
+                                  });
+                                }
                               },
                         icon: const Icon(Icons.search),
                         label: Text(_selectedMusic != null
@@ -332,12 +347,95 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                                 onPressed: () {
                                   setState(() {
                                     _selectedMusic = null;
+                                    _clipStartMs = null;
+                                    _clipEndMs = null;
                                   });
                                 },
                               ),
                             ],
                           ),
                         ),
+                        
+                        // Inline clip selector (only show when music selected)
+                        if (_selectedMusic != null) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[850],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  '⏱️ Chọn đoạn nhạc (30s)',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                
+                                // Slider
+                                Row(
+                                  children: [
+                                    const SizedBox(
+                                      width: 60,
+                                      child: Text(
+                                        'Bắt đầu:',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Slider(
+                                        value: (_clipStartMs ?? 0) / 1000,
+                                        min: 0,
+                                        max: 150, // Max 2.5 min
+                                        divisions: 150,
+                                        label: '${(_clipStartMs ?? 0) ~/ 1000}s',
+                                        onChanged: (value) {
+                                          setState(() {
+                                            _clipStartMs = (value * 1000).toInt();
+                                            _clipEndMs = _clipStartMs! + 30000; // Always 30s
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 40,
+                                      child: Text(
+                                        '${(_clipStartMs ?? 0) ~/ 1000}s',
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                
+                                // Info
+                                Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.purple.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      'Clip: ${(_clipStartMs ?? 0) ~/ 1000}s - ${(_clipEndMs ?? 30000) ~/ 1000}s',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.purpleAccent,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ],
                   ),

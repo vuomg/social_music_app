@@ -5,7 +5,7 @@
 
     "users": {
       "$uid": {
-        ".read": "auth != null && auth.uid == $uid",
+        ".read": "auth != null",
         ".write": "auth != null && auth.uid == $uid",
         "displayName": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 50" },
         "avatarUrl": { ".validate": "newData.isString() || newData.val() == null" },
@@ -18,50 +18,25 @@
       "$postId": {
         ".read": "auth != null",
         ".write": "auth != null && (!data.exists() || data.child('uid').val() == auth.uid)",
-
-        ".validate": "newData.hasChildren(['uid','musicId','musicTitle','musicOwnerName','audioUrl','createdAt','reactionSummary','commentCount'])",
-
         "uid": { ".validate": "newData.isString() && newData.val() == auth.uid" },
-
-        "authorName": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 50" },
-        "authorAvatarUrl": { ".validate": "newData.isString() || newData.val() == null" },
-
         "caption": { ".validate": "newData.isString() || newData.val() == null" },
-
-        "musicId": { ".validate": "newData.isString() && newData.val().length > 0" },
-        "musicTitle": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
-        "musicOwnerName": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 50" },
-
-        "audioUrl": { ".validate": "newData.isString() && newData.val().length > 0" },
+        "musicId": { ".validate": "newData.isString()" },
+        "musicTitle": { ".validate": "newData.isString()" },
+        "musicOwnerName": { ".validate": "newData.isString()" },
+        "audioUrl": { ".validate": "newData.isString()" },
         "coverUrl": { ".validate": "newData.isString() || newData.val() == null" },
-
         "createdAt": { ".validate": "newData.isNumber()" },
-        "updatedAt": { ".validate": "newData.isNumber() || newData.val() == null" },
-
         "commentCount": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-
-        "reactionSummary": {
-          ".validate": "newData.hasChildren(['like','love','haha','wow','sad','angry'])",
-          "like": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-          "love": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-          "haha": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-          "wow":  { ".validate": "newData.isNumber() && newData.val() >= 0" },
-          "sad":  { ".validate": "newData.isNumber() && newData.val() >= 0" },
-          "angry": { ".validate": "newData.isNumber() && newData.val() >= 0" }
-        }
+        "likesCount": { ".validate": "newData.isNumber() && newData.val() >= 0" }
       }
     },
 
-    "postReactions": {
+    "postLikes": {
       "$postId": {
         "$uid": {
           ".read": "auth != null",
           ".write": "auth != null && auth.uid == $uid",
-          ".validate": "newData.hasChildren(['type','updatedAt'])",
-          "type": {
-            ".validate": "newData.isString() && (newData.val() == 'like' || newData.val() == 'love' || newData.val() == 'haha' || newData.val() == 'wow' || newData.val() == 'sad' || newData.val() == 'angry')"
-          },
-          "updatedAt": { ".validate": "newData.isNumber()" }
+          ".validate": "newData.val() === true"
         }
       }
     },
@@ -71,14 +46,9 @@
         "$commentId": {
           ".read": "auth != null",
           ".write": "auth != null && (!data.exists() || data.child('uid').val() == auth.uid)",
-
-          ".validate": "newData.hasChildren(['uid','content','createdAt'])",
           "uid": { ".validate": "newData.isString() && newData.val() == auth.uid" },
-          "authorName": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 50" },
-          "authorAvatarUrl": { ".validate": "newData.isString() || newData.val() == null" },
           "content": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500" },
-          "createdAt": { ".validate": "newData.isNumber()" },
-          "updatedAt": { ".validate": "newData.isNumber() || newData.val() == null" }
+          "createdAt": { ".validate": "newData.isNumber()" }
         }
       }
     },
@@ -87,23 +57,38 @@
       "$musicId": {
         ".read": "auth != null",
         ".write": "auth != null && (!data.exists() || data.child('uid').val() == auth.uid)",
-
-        ".validate": "newData.hasChildren(['uid','ownerName','title','genre','audioUrl','audioPath','createdAt'])",
-
         "uid": { ".validate": "newData.isString() && newData.val() == auth.uid" },
-        "ownerName": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 50" },
-        "ownerAvatarUrl": { ".validate": "newData.isString() || newData.val() == null" },
+        "title": { ".validate": "newData.isString() && newData.val().length > 0" },
+        "genre": { ".validate": "newData.isString()" },
+        "audioUrl": { ".validate": "newData.isString()" }
+      }
+    },
 
-        "title": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
-        "genre": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30" },
-
-        "audioUrl": { ".validate": "newData.isString() && newData.val().length > 0" },
-        "audioPath": { ".validate": "newData.isString() && newData.val().length > 0" },
-        "coverUrl": { ".validate": "newData.isString() || newData.val() == null" },
-        "coverPath": { ".validate": "newData.isString() || newData.val() == null" },
-
+    "musicRooms": {
+      "$roomId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (!data.exists() || data.child('hostUid').val() == auth.uid || data.child('members').child(auth.uid).exists())",
+        ".validate": "newData.child('roomId').isString() && newData.child('roomId').val().matches(/^[0-9]{4}$/)",
+        
+        "roomId": { ".validate": "newData.isString() && newData.val().matches(/^[0-9]{4}$/)" },
+        "hostUid": { ".validate": "newData.isString()" },
+        "hostName": { ".validate": "newData.isString()" },
+        "musicId": { ".validate": "newData.isString() || newData.val() == null" },
+        "musicTitle": { ".validate": "newData.isString() || newData.val() == null" },
+        "audioUrl": { ".validate": "newData.isString() || newData.val() == null" },
+        "isPlaying": { ".validate": "newData.isBoolean()" },
+        "currentPositionMs": { ".validate": "newData.isNumber() && newData.val() >= 0" },
         "createdAt": { ".validate": "newData.isNumber()" },
-        "updatedAt": { ".validate": "newData.isNumber() || newData.val() == null" }
+        "updatedAt": { ".validate": "newData.isNumber()" },
+        
+        "members": {
+          "$memberUid": {
+            ".write": "auth != null && (auth.uid == $memberUid || root.child('musicRooms').child($roomId).child('hostUid').val() == auth.uid)",
+            "displayName": { ".validate": "newData.isString()" },
+            "avatarUrl": { ".validate": "newData.isString() || newData.val() == null" },
+            "joinedAt": { ".validate": "newData.isNumber()" }
+          }
+        }
       }
     }
   }

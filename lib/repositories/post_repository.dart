@@ -93,13 +93,15 @@ class PostRepository {
   }
 
   /// Tạo post từ music đã có
-  Future<void> createPostFromMusic({
+  Future<String> createPostFromMusic({
     required String uid,
     required String authorName,
     String? authorAvatarUrl,
     String? caption,
     required MusicModel music,
     File? postCoverFile, // Cover riêng cho post (optional)
+    int? startTimeMs, // Start time for clip
+    int? endTimeMs,   // End time for clip
   }) async {
     final postId = DateTime.now().millisecondsSinceEpoch.toString();
     
@@ -119,8 +121,8 @@ class PostRepository {
     }
 
     // Lưu post vào DB
-    final postRef = _dbService.postsRef().child(postId);
-    await postRef.set({
+    final postsRef = _dbService.postsRef();
+    await postsRef.push().set({
       'uid': uid,
       'authorName': authorName,
       'authorAvatarUrl': authorAvatarUrl,
@@ -128,19 +130,36 @@ class PostRepository {
       'musicId': music.musicId,
       'musicTitle': music.title,
       'musicOwnerName': music.ownerName,
-      'audioUrl': music.audioUrl, // Snapshot để play nhanh
+      'audioUrl': music.audioUrl,
       'coverUrl': coverUrl,
       'createdAt': ServerValue.timestamp,
+      'updatedAt': null,
       'commentCount': 0,
-      'reactionSummary': {
-        'like': 0,
-        'love': 0,
-        'haha': 0,
-        'wow': 0,
-        'sad': 0,
-        'angry': 0,
-      },
+      'likesCount': 0,
+      'startTimeMs': startTimeMs,
+      'endTimeMs': endTimeMs,
     });
+
+    return postId;
+  }
+
+  /// Lấy 1 post theo ID (one-time read)
+  Future<PostModel?> getPost(String postId) async {
+    try {
+      final snapshot = await _dbService.postsRef().child(postId).get();
+      
+      if (!snapshot.exists || snapshot.value == null) {
+        return null;
+      }
+
+      return PostModel.fromJson(
+        Map<String, dynamic>.from(snapshot.value as Map),
+        postId,
+      );
+    } catch (e) {
+      print('❌ Lỗi lấy post: $e');
+      return null;
+    }
   }
 
   Future<void> deletePost(PostModel post) async {

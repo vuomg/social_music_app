@@ -12,7 +12,11 @@ class PostModel {
   final int createdAt;
   final int? updatedAt;
   final int commentCount;
-  final Map<String, int> reactionSummary;
+  final int likesCount;
+  
+  // Music clip selection (like Facebook Music Note)
+  final int? startTimeMs; // Start position in milliseconds
+  final int? endTimeMs;   // End position in milliseconds
 
   PostModel({
     required this.postId,
@@ -28,14 +32,16 @@ class PostModel {
     required this.createdAt,
     this.updatedAt,
     required this.commentCount,
-    required this.reactionSummary,
+    required this.likesCount,
+    this.startTimeMs,
+    this.endTimeMs,
   });
 
   factory PostModel.fromJson(Map<String, dynamic> json, String postId) {
     return PostModel(
       postId: postId,
       uid: json['uid'] as String,
-      authorName: json['authorName'] as String,
+      authorName: json['authorName'] as String? ?? 'Unknown',
       authorAvatarUrl: json['authorAvatarUrl'] as String?,
       caption: json['caption'] as String?,
       musicId: json['musicId'] as String,
@@ -46,16 +52,9 @@ class PostModel {
       createdAt: json['createdAt'] as int,
       updatedAt: json['updatedAt'] as int?,
       commentCount: json['commentCount'] as int? ?? 0,
-      reactionSummary: (json['reactionSummary'] as Map<dynamic, dynamic>?)
-              ?.map((key, value) => MapEntry(key.toString(), value as int)) ??
-          {
-            'like': 0,
-            'love': 0,
-            'haha': 0,
-            'wow': 0,
-            'sad': 0,
-            'angry': 0,
-          },
+      likesCount: json['likesCount'] as int? ?? 0,
+      startTimeMs: json['startTimeMs'] as int?,
+      endTimeMs: json['endTimeMs'] as int?,
     );
   }
 
@@ -73,7 +72,14 @@ class PostModel {
       'createdAt': createdAt,
       'updatedAt': updatedAt,
       'commentCount': commentCount,
-      'reactionSummary': reactionSummary,
+      'likesCount': likesCount,
+      'startTimeMs': startTimeMs,
+      'endTimeMs': endTimeMs,
     };
   }
+  
+  // Helper getters
+  int get commentsCount => commentCount;
+  int get savesCount => 0;
+  String get musicArtist => musicOwnerName;
 }

@@ -38,4 +38,14 @@ class RealtimeDatabaseService {
   DatabaseReference musicsRef() {
     return _database.ref('musics');
   }
+
+  /// Reference đến listening rooms
+  DatabaseReference listeningRoomsRef() {
+    return _database.ref('listeningRooms');
+  }
+
+  /// Reference đến messages của một listening room
+  DatabaseReference listeningRoomMessagesRef(String roomId) {
+    return _database.ref('listeningRoomMessages/$roomId');
+  }
 }

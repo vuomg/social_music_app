@@ -13,6 +13,36 @@ class MusicRepository {
   Stream<List<MusicModel>>? _allMusicsStream;
   final Map<String, Stream<List<MusicModel>>> _myMusicsStreams = {};
 
+  /// Stream all music (for music picker)
+  Stream<List<MusicModel>> streamAllMusic() {
+    return _dbService.musicsRef().onValue.map((event) {
+      if (!event.snapshot.exists || event.snapshot.value == null) {
+        return <MusicModel>[];
+      }
+
+      final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+      final musics = <MusicModel>[];
+
+      data.forEach((key, value) {
+        if (value is Map) {
+          try {
+            final music = MusicModel.fromJson(
+              Map<String, dynamic>.from(value),
+              key,
+            );
+            musics.add(music);
+          } catch (e) {
+            debugPrint('Error parsing music: $e');
+          }
+        }
+      });
+
+      // Sort by createdAt descending
+      musics.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return musics;
+    });
+  }
+
   /// Tạo music mới (upload file + lưu DB)
   Future<MusicModel> createMusic({
     required String uid,

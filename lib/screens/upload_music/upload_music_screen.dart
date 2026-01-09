@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../providers/auth_provider.dart' as app_auth;
@@ -20,7 +21,7 @@ class _UploadMusicScreenState extends State<UploadMusicScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   String? _selectedGenre;
-  bool _isLoading = false;
+  bool _isUploading = false;
   double _uploadProgress = 0.0;
   
   File? _audioFile;
@@ -133,59 +134,49 @@ class _UploadMusicScreenState extends State<UploadMusicScreen> {
       return;
     }
 
-    final authProvider = Provider.of<app_auth.AuthProvider>(context, listen: false);
-    final user = authProvider.user;
-    
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng đăng nhập')),
-      );
-      return;
-    }
-
     setState(() {
-      _isLoading = true;
-      _uploadProgress = 0.0;
+      _isUploading = true;
     });
 
     try {
-      final uid = user.uid;
-      final userInfo = await _userRepository.getUser(uid);
-      String ownerName = userInfo?.displayName ?? user.displayName ?? 'Unknown';
-      final ownerAvatarUrl = userInfo?.avatarUrl;
-
-      if (ownerName.length > 50) {
-        ownerName = ownerName.substring(0, 50);
+      final user = Provider.of<app_auth.AuthProvider>(context, listen: false).user; // Using app_auth.AuthProvider
+      if (user == null) {
+        throw Exception('User not logged in');
       }
 
-      final title = _titleController.text.trim();
-      if (title.length > 120) {
-        throw Exception('Tiêu đề không được quá 120 ký tự');
+      // 1. Upload audio to storage
+      final audioFileName = 'audio_${DateTime.now().millisecondsSinceEpoch}.${_audioFile!.path.split('.').last}';
+      final audioStorageRef = FirebaseStorage.instance.ref().child('music/$audioFileName');
+      await audioStorageRef.putFile(_audioFile!);
+      final audioUrl = await audioStorageRef.getDownloadURL();
+
+      // 2. Upload cover if selected
+      String? coverUrl;
+      String? coverPath;
+      if (_coverFile != null) {
+        final coverFileName = 'cover_${DateTime.now().millisecondsSinceEpoch}.${_coverFile!.path.split('.').last}';
+        final coverStorageRef = FirebaseStorage.instance.ref().child('covers/$coverFileName');
+        await coverStorageRef.putFile(_coverFile!);
+        coverUrl = await coverStorageRef.getDownloadURL();
+        coverPath = 'covers/$coverFileName';
       }
 
-      if (_selectedGenre!.length > 30) {
-        throw Exception('Thể loại không được quá 30 ký tự');
-      }
+      // 3. Save music to database (NOT creating a post)
+      final musicData = {
+        'uid': user.uid,
+        'ownerName': user.displayName ?? 'Unknown',
+        'ownerAvatarUrl': user.photoURL,
+        'title': _titleController.text.trim(),
+        'genre': _selectedGenre,
+        'audioUrl': audioUrl,
+        'audioPath': 'music/$audioFileName',
+        'coverUrl': coverUrl,
+        'coverPath': coverPath,
+        'createdAt': ServerValue.timestamp,
+      };
 
-      setState(() {
-        _uploadProgress = 0.3;
-      });
-
-      // Upload music
-      await _musicRepository.createMusic(
-        uid: uid,
-        ownerName: ownerName,
-        ownerAvatarUrl: ownerAvatarUrl,
-        title: title,
-        genre: _selectedGenre!,
-        audioFile: _audioFile!,
-        coverFile: _coverFile,
-      );
-
-      setState(() {
-        _uploadProgress = 1.0;
-        _isLoading = false;
-      });
+      // Save to musics collection
+      await FirebaseDatabase.instance.ref('musics').push().set(musicData);
 
       if (mounted) {
         // Reset form
@@ -198,22 +189,24 @@ class _UploadMusicScreenState extends State<UploadMusicScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Upload nhạc thành công!'),
+            content: Text('Tải nhạc lên thành công!'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
           ),
         );
+        // Navigator.pop(context); // Removed as per original behavior, just resets form
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _uploadProgress = 0.0;
-        });
-
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi upload nhạc: ${e.toString()}')),
+          SnackBar(content: Text('Lỗi: ${e.toString()}')),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
       }
     }
   }
@@ -276,7 +269,7 @@ class _UploadMusicScreenState extends State<UploadMusicScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: _isLoading ? null : _handlePickAudio,
+                onPressed: _isUploading ? null : _handlePickAudio,
                 icon: const Icon(Icons.audio_file),
                 label: Text(_audioFile != null
                     ? 'Audio: ${_audioFile!.path.split('/').last}'
@@ -287,7 +280,7 @@ class _UploadMusicScreenState extends State<UploadMusicScreen> {
               ),
               const SizedBox(height: 12),
               ElevatedButton.icon(
-                onPressed: _isLoading ? null : _handlePickCover,
+                onPressed: _isUploading ? null : _handlePickCover,
                 icon: const Icon(Icons.image),
                 label: Text(_coverFile != null
                     ? 'Cover: ${_coverFile!.path.split('/').last}'
@@ -296,12 +289,12 @@ class _UploadMusicScreenState extends State<UploadMusicScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
               ),
-              if (_isLoading) ...[
+              if (_isUploading) ...[ 
                 const SizedBox(height: 16),
-                LinearProgressIndicator(value: _uploadProgress),
+                const LinearProgressIndicator(),
                 const SizedBox(height: 8),
                 Text(
-                  'Đang upload... ${(_uploadProgress * 100).toInt()}%',
+                  'Đang upload...',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.grey[600],
@@ -311,7 +304,7 @@ class _UploadMusicScreenState extends State<UploadMusicScreen> {
               ],
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: _isLoading ? null : _handleUpload,
+                onPressed: _isUploading ? null : _handleUpload,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -324,4 +317,3 @@ class _UploadMusicScreenState extends State<UploadMusicScreen> {
     );
   }
 }
-

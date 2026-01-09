@@ -187,9 +187,9 @@ class _MusicPostCardState extends State<MusicPostCard> with SingleTickerProvider
     );
   }
 
-  /// Tính tổng reactions từ reactionSummary
-  int get _totalReactions {
-    return widget.post.reactionSummary.values.fold(0, (sum, count) => sum + count);
+  /// Get total likes
+  int _getTotalLikes() {
+    return widget.post.likesCount;
   }
 
   /// Format timestamp thành relative time
@@ -499,7 +499,7 @@ class _MusicPostCardState extends State<MusicPostCard> with SingleTickerProvider
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        '$_totalReactions',
+                        '${_getTotalLikes()}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 15,

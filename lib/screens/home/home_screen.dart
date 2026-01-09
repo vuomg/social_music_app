@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import '../feed/feed_screen.dart';
 import '../music_library/music_library_screen.dart';
 import '../create_post/create_post_screen.dart';
 import '../profile/profile_screen.dart';
-import '../friends/friends_screen.dart';
+import '../music_rooms/music_rooms_screen.dart'; // Changed from friends_screen.dart
 import '../notifications/notifications_screen.dart';
 import '../search/search_screen.dart';
 import '../../widgets/mini_player.dart';
 import '../../widgets/notification_badge.dart';
+import '../../providers/audio_player_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,54 +32,37 @@ class _HomeScreenState extends State<HomeScreen> {
     const FeedScreen(),
     const MusicLibraryScreen(),
     CreatePostScreen(onPostSuccess: _switchToFeed),
-    const FriendsScreen(),
+    const MusicRoomsScreen(), // Changed from FriendsScreen()
     const ProfileScreen(),
   ];
+
+  void _onTabChanged(int index) {
+    // Stop audio khi chuyển tab KHỎI Feed (tab 0)
+    if (_currentIndex == 0 && index != 0) {
+      final audioProvider =
+          Provider.of<AudioPlayerProvider>(context, listen: false);
+      audioProvider.stop();
+      print('🔇 Stopped audio (leaving Feed tab)');
+    }
+
+    setState(() {
+      _currentIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          // Main content với padding bottom để tránh bị che bởi mini player
-          Padding(
-            padding: const EdgeInsets.only(bottom: 70),
-            child: IndexedStack(
-              index: _currentIndex,
-              children: _screens,
-            ),
-          ),
-          // Mini player ở bottom (trên bottom navigation bar)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 56, // Height của BottomNavigationBar (fixed type)
-            child: const MiniPlayer(),
-          ),
-          // Nút Tìm kiếm và Thông báo ở góc trên bên phải
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            right: 16,
-            child: Row(
-              children: [
-                _buildSearchButton(),
-                const SizedBox(width: 8),
-                _buildNotificationButton(),
-              ],
-            ),
-          ),
-        ],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         backgroundColor: Theme.of(context).colorScheme.surface,
         selectedItemColor: Theme.of(context).colorScheme.primary,
         unselectedItemColor: Colors.grey[400],
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onTap: _onTabChanged, // Use new method
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
@@ -93,8 +78,9 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Post',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.people),
-            label: 'Friends',
+            icon: Icon(Icons.music_note_outlined),
+            activeIcon: Icon(Icons.music_note),
+            label: 'Phòng',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),

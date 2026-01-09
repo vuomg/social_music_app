@@ -77,4 +77,25 @@ class CommentRepository {
       return Transaction.success(data);
     });
   }
+
+  Future<void> deleteComment(String postId, String commentId) async {
+    final commentsRef = _dbService.commentsRef(postId).child(commentId);
+    
+    // Delete comment
+    await commentsRef.remove();
+
+    // Decrement commentCount using transaction
+    final postRef = _dbService.postsRef().child(postId);
+    await postRef.runTransaction((currentData) {
+      if (currentData == null) {
+        return Transaction.abort();
+      }
+      
+      final data = Map<String, dynamic>.from(currentData as Map);
+      final currentCount = (data['commentCount'] as num?)?.toInt() ?? 0;
+      data['commentCount'] = currentCount > 0 ? currentCount - 1 : 0;
+      
+      return Transaction.success(data);
+    });
+  }
 }

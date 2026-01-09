@@ -2,13 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../../models/post_model.dart';
 import '../../models/comment_model.dart';
 import '../../providers/auth_provider.dart' as app_auth;
 import '../../providers/audio_player_provider.dart';
 import '../../repositories/comment_repository.dart';
-import '../../repositories/reaction_repository.dart';
+import '../../repositories/like_repository.dart';
 import '../../repositories/post_repository.dart';
 import '../../services/realtime_db_service.dart';
 import '../../models/user_model.dart';
@@ -28,9 +29,9 @@ class PostDetailScreen extends StatefulWidget {
 }
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
-  final CommentRepository _commentRepository = CommentRepository();
-  final ReactionRepository _reactionRepository = ReactionRepository();
   final PostRepository _postRepository = PostRepository();
+  final LikeRepository _likeRepository = LikeRepository();
+  final CommentRepository _commentRepository = CommentRepository();
   final RealtimeDatabaseService _dbService = RealtimeDatabaseService();
   
   final TextEditingController _commentController = TextEditingController();
@@ -40,14 +41,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Timer? _debounceTimer;
 
   PostModel? _currentPost;
-  String? _myReaction;
+  bool _isLiked = false;
 
   // Stream subscriptions
-  StreamSubscription<String?>? _myReactionSubscription;
+  StreamSubscription<bool>? _myLikeSubscription;
   StreamSubscription<DatabaseEvent>? _postUpdateSubscription;
 
   // Cached streams
-  Stream<String?>? _myReactionStream;
+  Stream<bool>? _myLikeStream;
   Stream<List<CommentModel>>? _commentsStream;
 
   @override
@@ -59,7 +60,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     _commentsStream = _commentRepository.streamComments(_currentPost!.postId);
     
     _initAudio();
-    _loadMyReaction();
+    _loadMyLike();
     _listenToPostUpdates();
   }
 
@@ -69,17 +70,23 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     audioProvider.playPost(_currentPost!);
   }
 
-  void _loadMyReaction() {
-    final authProvider = Provider.of<app_auth.AuthProvider>(context, listen: false);
-    final user = authProvider.user;
-    if (user != null) {
-      // Cache stream để không tạo mới mỗi lần build
-      _myReactionStream ??= _reactionRepository.streamMyReaction(_currentPost!.postId, user.uid);
+  Stream<bool>? _getMyLikeStream() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || _currentPost == null) return null;
+    
+    _myLikeStream ??= _likeRepository.streamUserLike(_currentPost!.postId, user.uid);
+    return _myLikeStream;
+  }
+
+  void _loadMyLike() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && _currentPost != null) {
+      _myLikeStream ??= _likeRepository.streamUserLike(_currentPost!.postId, user.uid);
       
-      _myReactionSubscription = _myReactionStream!.listen((reaction) {
+      _myLikeSubscription = _myLikeStream!.listen((isLiked) {
         if (mounted) {
           setState(() {
-            _myReaction = reaction;
+            _isLiked = isLiked;
           });
         }
       });
@@ -174,13 +181,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         });
 
         try {
-          final newType = selectedType == _myReaction ? null : selectedType;
-          await _reactionRepository.setReaction(
-            postId: _currentPost!.postId,
-            uid: user.uid,
-            newType: newType,
-          );
+          if (_currentPost != null) {
+            final user = FirebaseAuth.instance.currentUser;
+            if (user != null) {
+              await _likeRepository.togglePostLike(
+                postId: _currentPost!.postId,
+                uid: user.uid,
+              );
+            }
+          }
         } catch (e) {
+          debugPrint('Error toggling like: $e');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Lỗi: ${e.toString()}')),
@@ -198,7 +209,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   Widget _buildReactionButton(String type, String emoji, BuildContext context) {
-    final isSelected = _myReaction == type;
+    final isSelected = _isLiked;
     return GestureDetector(
       onTap: () => Navigator.pop(context, type),
       child: Container(
@@ -336,7 +347,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   @override
   void dispose() {
     // Cancel all subscriptions
-    _myReactionSubscription?.cancel();
+    _myLikeSubscription?.cancel();
     _postUpdateSubscription?.cancel();
     
     _commentController.dispose();
@@ -549,47 +560,37 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   const SizedBox(height: 16),
                   
                   // Reactions
-                  Builder(
-                    builder: (context) {
-                      final myReaction = _myReaction;
-                      return Row(
-                        children: [
-                          GestureDetector(
-                            onTap: _showReactionBottomSheet,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey[700]!),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    myReaction == 'like' ? '👍'
-                                        : myReaction == 'love' ? '❤️'
-                                        : myReaction == 'haha' ? '😂'
-                                        : myReaction == 'wow' ? '😮'
-                                        : myReaction == 'sad' ? '😢'
-                                        : myReaction == 'angry' ? '😠'
-                                        : '👍',
-                                    style: const TextStyle(fontSize: 16),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${_currentPost!.reactionSummary.values.fold(0, (a, b) => a + b)}',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: _showReactionBottomSheet,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[700]!),
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                        ],
-                      );
-                    },
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _isLiked ? Icons.favorite : Icons.favorite_border,
+                                color: _isLiked ? Colors.red : Colors.white,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${_currentPost!.likesCount}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   

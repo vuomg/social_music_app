@@ -44,14 +44,14 @@ dependencies:
   file_picker: ^10.3.7
   image_picker: ^1.2.1
   just_audio: ^0.10.5
-  audio_session: ^0.1.19
+  audio_session: ^0.2.2
   uuid: ^4.5.2
   intl: ^0.20.2
-  connectivity_plus: ^6.1.0
+  connectivity_plus: ^7.0.0
   cached_network_image: ^3.3.1
   geocoding: ^4.0.0
   geolocator: ^14.0.2
-  google_fonts: ^6.1.0
+  google_fonts: ^7.0.0
 
 dev_dependencies:
   flutter_test:

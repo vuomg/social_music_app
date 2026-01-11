@@ -63,18 +63,11 @@ class CommentRepository {
       'createdAt': ServerValue.timestamp,
     });
 
-    // Update commentCount using transaction
-    final postRef = _dbService.postsRef().child(postId);
-    await postRef.runTransaction((currentData) {
-      if (currentData == null) {
-        return Transaction.abort();
-      }
-      
-      final data = Map<String, dynamic>.from(currentData as Map);
-      final currentCount = (data['commentCount'] as num?)?.toInt() ?? 0;
-      data['commentCount'] = currentCount + 1;
-      
-      return Transaction.success(data);
+    // Update commentCount using transaction (only update the count field)
+    final commentCountRef = _dbService.postsRef().child(postId).child('commentCount');
+    await commentCountRef.runTransaction((currentValue) {
+      final currentCount = (currentValue as num?)?.toInt() ?? 0;
+      return Transaction.success(currentCount + 1);
     });
   }
 
@@ -84,18 +77,11 @@ class CommentRepository {
     // Delete comment
     await commentsRef.remove();
 
-    // Decrement commentCount using transaction
-    final postRef = _dbService.postsRef().child(postId);
-    await postRef.runTransaction((currentData) {
-      if (currentData == null) {
-        return Transaction.abort();
-      }
-      
-      final data = Map<String, dynamic>.from(currentData as Map);
-      final currentCount = (data['commentCount'] as num?)?.toInt() ?? 0;
-      data['commentCount'] = currentCount > 0 ? currentCount - 1 : 0;
-      
-      return Transaction.success(data);
+    // Decrement commentCount using transaction (only update the count field)
+    final commentCountRef = _dbService.postsRef().child(postId).child('commentCount');
+    await commentCountRef.runTransaction((currentValue) {
+      final currentCount = (currentValue as num?)?.toInt() ?? 0;
+      return Transaction.success(currentCount > 0 ? currentCount - 1 : 0);
     });
   }
 }

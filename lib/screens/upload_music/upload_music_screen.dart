@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
@@ -138,15 +139,23 @@ class _UploadMusicScreenState extends State<UploadMusicScreen> {
       _isUploading = true;
     });
 
+
     try {
       final user = Provider.of<app_auth.AuthProvider>(context, listen: false).user; // Using app_auth.AuthProvider
       if (user == null) {
         throw Exception('User not logged in');
       }
 
+      // Check Firebase Auth current user
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) {
+        throw Exception('Firebase Authentication required. Please logout and login again.');
+      }
+
       // 1. Upload audio to storage
       final audioFileName = 'audio_${DateTime.now().millisecondsSinceEpoch}.${_audioFile!.path.split('.').last}';
       final audioStorageRef = FirebaseStorage.instance.ref().child('music/$audioFileName');
+      
       await audioStorageRef.putFile(_audioFile!);
       final audioUrl = await audioStorageRef.getDownloadURL();
 

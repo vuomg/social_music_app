@@ -158,6 +158,101 @@ class MusicRepository {
     return _allMusicsStream!;
   }
 
+  /// Stream recent musics với pagination (limit số lượng)
+  Stream<List<MusicModel>> streamRecentMusics({
+    int limit = 10,
+    int? startAfterTimestamp,
+  }) {
+    Query query = _dbService
+        .musicsRef()
+        .orderByChild('createdAt');
+    
+    if (startAfterTimestamp != null) {
+      // Load older items (before this timestamp)
+      query = query.endBefore(startAfterTimestamp).limitToLast(limit);
+    } else {
+      // Load most recent items
+      query = query.limitToLast(limit);
+    }
+    
+    return query.onValue.map((event) {
+      if (event.snapshot.value == null) {
+        return <MusicModel>[];
+      }
+
+      final Map<dynamic, dynamic> data =
+          event.snapshot.value as Map<dynamic, dynamic>;
+      final List<MusicModel> musics = [];
+
+      data.forEach((key, value) {
+        if (value is Map) {
+          try {
+            musics.add(MusicModel.fromJson(
+              Map<String, dynamic>.from(value),
+              key.toString(),
+            ));
+          } catch (e) {
+            // Skip invalid musics
+          }
+        }
+      });
+
+      musics.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return musics;
+    });
+  }
+
+  /// Fetch musics với pagination (one-time fetch, không stream)
+  Future<List<MusicModel>> fetchRecentMusics({
+    int limit = 10,
+    int? startAfterTimestamp,
+  }) async {
+    try {
+      Query query = _dbService
+          .musicsRef()
+          .orderByChild('createdAt');
+      
+      if (startAfterTimestamp != null) {
+        query = query.endBefore(startAfterTimestamp).limitToLast(limit);
+      } else {
+        query = query.limitToLast(limit);
+      }
+      
+      final snapshot = await query.get().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Timeout loading musics');
+        },
+      );
+      
+      if (!snapshot.exists || snapshot.value == null) {
+        return <MusicModel>[];
+      }
+
+      final Map<dynamic, dynamic> data =
+          snapshot.value as Map<dynamic, dynamic>;
+      final List<MusicModel> musics = [];
+
+      data.forEach((key, value) {
+        if (value is Map) {
+          try {
+            musics.add(MusicModel.fromJson(
+              Map<String, dynamic>.from(value),
+              key.toString(),
+            ));
+          } catch (e) {
+            // Skip invalid musics
+          }
+        }
+      });
+
+      musics.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return musics;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   /// Stream musics của user
   Stream<List<MusicModel>> streamMyMusics(String uid) {
     // Cache stream theo uid để tránh tạo lại

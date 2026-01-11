@@ -17,11 +17,13 @@ class _MusicLibraryScreenState extends State<MusicLibraryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final MusicRepository _musicRepository = MusicRepository();
-  List<MusicModel>? _cachedAllMusics;
-  List<MusicModel>? _cachedMyMusics;
   
-  // Cache stream instances để không bị dispose khi chuyển tab
+  // Stream state cho "Tất cả" tab - chỉ load 50 bài gần nhất
+  List<MusicModel>? _cachedAllMusics;
   Stream<List<MusicModel>>? _allMusicsStream;
+  
+  // State cho "Của tôi" tab
+  List<MusicModel>? _cachedMyMusics;
   Stream<List<MusicModel>>? _myMusicsStream;
 
   @override
@@ -29,42 +31,27 @@ class _MusicLibraryScreenState extends State<MusicLibraryScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     
-    // Listen to tab changes để update IndexedStack
+    // Listen to tab changes
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
         setState(() {}); // Update IndexedStack index
       }
     });
     
-    // Cache streams ngay từ đầu để không bị dispose
+    // Setup streams
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
-      _allMusicsStream = _musicRepository.streamAllMusics();
+      // Stream cho "Tất cả" - limit 50 bài mới nhất
+      _allMusicsStream = _musicRepository.streamRecentMusics(limit: 50);
+      // Stream cho "Của tôi"
       _myMusicsStream = _musicRepository.streamMyMusics(currentUser.uid);
     }
-    
-    // Preload data
-    _preloadData();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
-  }
-
-  Future<void> _preloadData() async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) return;
-
-    try {
-      // Preload all musics
-      _cachedAllMusics = await _musicRepository.streamAllMusics().first;
-      // Preload my musics
-      _cachedMyMusics = await _musicRepository.streamMyMusics(currentUser.uid).first;
-    } catch (e) {
-      // Ignore errors during preload
-    }
   }
 
   Future<void> _handleDeleteMusic(
@@ -110,6 +97,8 @@ class _MusicLibraryScreenState extends State<MusicLibraryScreen>
         musicId: music.musicId,
         uid: currentUser.uid,
       );
+
+      // Stream sẽ tự động update khi data thay đổi
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -170,26 +159,47 @@ class _MusicLibraryScreenState extends State<MusicLibraryScreen>
 
   Widget _buildAllMusicsTab(User currentUser) {
     return StreamBuilder<List<MusicModel>>(
-      stream: _musicRepository.streamAllMusics(),
-      initialData: _cachedAllMusics, // Hiển thị cached data ngay
+      stream: _allMusicsStream,
+      initialData: _cachedAllMusics,
       builder: (context, snapshot) {
-        // Cập nhật cache khi có data mới
+        // Update cache
         if (snapshot.hasData && snapshot.data != null) {
           _cachedAllMusics = snapshot.data;
         }
 
+        // Loading state
         if (snapshot.connectionState == ConnectionState.waiting && 
             _cachedAllMusics == null) {
           return const Center(child: CircularProgressIndicator());
         }
 
+        // Error state  
         if (snapshot.hasError) {
           return Center(
-            child: Text('Lỗi: ${snapshot.error}'),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text('Lỗi: ${snapshot.error}'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _cachedAllMusics = null;
+                      _allMusicsStream = _musicRepository.streamRecentMusics(limit: 50);
+                    });
+                  },
+                  child: const Text('Thử lại'),
+                ),
+              ],
+            ),
           );
         }
 
         final musics = snapshot.data ?? [];
+        
+        // Empty state
         if (musics.isEmpty) {
           return Center(
             child: Column(
@@ -221,6 +231,7 @@ class _MusicLibraryScreenState extends State<MusicLibraryScreen>
           );
         }
 
+        // List view
         return ListView.builder(
           padding: const EdgeInsets.only(bottom: 80), // Space for FAB
           itemCount: musics.length,

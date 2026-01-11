@@ -7,7 +7,7 @@ import '../../providers/audio_player_provider.dart';
 import '../../widgets/common/loading_widget.dart';
 import '../../widgets/common/empty_state_widget.dart';
 import '../../widgets/common/error_widget.dart';
-import 'widgets/feed_item.dart';
+import '../../widgets/feed/feed_item.dart';
 import '../post_detail/post_detail_screen.dart';
 
 /// FEED SCREEN - TikTok Style
